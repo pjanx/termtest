@@ -1,0 +1,30 @@
+termtest
+========
+
+'termtest' is a tool to test the terminal's features in a semi-automated way.
+
+I considered writing this in Python but it has a shitty curses library where you
+need to call `initscr()` before anything else.  Overall, it is a good idea to
+avoid such layers on top of the terminfo library.
+
+Using
+-----
+Build dependencies: a C99 compiler (tcc is guaranteed to work) +
+Runtime dependencies: ncurses
+
+ $ git clone https://git.janouch.name/p/termtest.git
+ $ c99 termtest.c -o termtest -lncurses
+ $ ./termtest
+
+Contributing and Support
+------------------------
+Use https://git.janouch.name/p/termtest to report any bugs, request features,
+or submit pull requests.  `git send-email` is tolerated.  If you want to discuss
+the project, feel free to join me at ircs://irc.janouch.name, channel #dev.
+
+Bitcoin donations are accepted at: 12r5uEWEgcHC46xd64tt3hHt9EUvYYDHe9
+
+License
+-------
+This software is released under the terms of the 0BSD license, the text of which
+is included within the package along with the list of authors.
