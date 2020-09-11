@@ -32,6 +32,9 @@
 #include <term.h>
 
 #define CSI "\x1b["
+#define OSC "\x1b]"
+#define BEL "\x07"
+#define ST  "\x9c"
 
 extern char **environ;
 static struct termios saved_termios;
@@ -70,7 +73,7 @@ static char *comm(const char *req, bool wait_first) {
 	char buf[1000] = ""; size_t buf_len = 0; int n = 0;
 	struct pollfd pfd = { .fd = STDIN_FILENO, .events = POLLIN };
 	if (wait_first) poll(&pfd, 1, -1);
-	while ((n = poll(&pfd, 1, 15 /* unreliable, timing-dependent */))) {
+	while ((n = poll(&pfd, 1, 50 /* unreliable, timing-dependent */))) {
 		if (n < 0) return NULL;
 		len = read(STDIN_FILENO, buf + buf_len, sizeof buf - buf_len - 1);
 		if (len <= 0) return NULL;
@@ -182,6 +185,12 @@ int main(int argc, char *argv[]) {
 		printf("\n");
 	}
 
+	// See tmux(1), TERMINFO EXTENSIONS. These are somewhat unusual,
+	// including them out of curiosity.
+	const char *Tc = tigetstr("Tc");
+	if (Tc && Tc != (char *)-1)
+		printf("Terminfo: tmux extension claims direct color.\n");
+
 	// TODO:
 	//  - terminfo
 	//  - hardcoded visual check
@@ -212,11 +221,11 @@ int main(int argc, char *argv[]) {
 		printf("\n");
 	}
 
-	printf("\x1b[0;32;44m" "SGR" "\x1b[m ");
-	printf("\x1b[1;32;44m" "Bold" "\x1b[m ");
-	printf("\x1b[5;32;44m" "Blink" "\x1b[m ");
+	printf(CSI "0;32;44m" "SGR" CSI "m ");
+	printf(CSI "1;32;44m" "Bold" CSI "m ");
+	printf(CSI "5;32;44m" "Blink" CSI "m ");
 	printf("\n");
-	printf("\x1b[0;5m" "Blink with default colours." "\x1b[m");
+	printf(CSI "0;5m" "Blink with default colours." CSI "m");
 	printf("\n");
 
 	printf("-- Italic attribute\n");
@@ -227,6 +236,13 @@ int main(int argc, char *argv[]) {
 	printf(CSI "3m" "SGR test.\n" CSI "0m");
 
 	printf("-- Bar cursor\n");
+	const char *Ss = tigetstr("Ss");
+	const char *Se = tigetstr("Se");
+	if (Ss && Ss != (char*)-1)
+		printf("Terminfo: found tmux extension for setting.\n");
+	if (Se && Se != (char*)-1)
+		printf("Terminfo: found tmux extension for resetting.\n");
+
 	comm(CSI "5 q" "Blinking (press a key): ", true);
 	printf("\n");
 	comm(CSI "6 q" "Steady (press a key): ", true);
@@ -271,8 +287,24 @@ int main(int argc, char *argv[]) {
 	}
 	comm(CSI "?1000l", false);
 
-	// TODO: Should test the ability to copy arbitrary text to clipboard,
-	// see ctlseqs: Manipulate Selection Data
+	printf("-- Selection\n");
+	const char *Ms = tigetstr("Ms");
+	if (Ms && Ms != (char *)-1)
+		printf("Terminfo: found tmux extension for selections.\n");
+
+	char *selection = comm(OSC "52;pc;?" BEL, false);
+	if (!strncmp(selection, OSC "52;", 5)) {
+		printf("We have received the selection from the terminal!" CSI "1m\n");
+		char *semi = strrchr(selection, ';');
+		*strpbrk(semi, BEL ST) = 0;
+		FILE *fp = popen("base64 -d", "w");
+		fprintf(fp, "%s", semi + 1);
+		fclose(fp);
+		printf(CSI "m\n");
+	}
+
+	comm(OSC "52;pc;VGVzdA==" BEL /* ST didn't work, UTF-8 issues? */, false);
+	comm("Check if the selection now contains 'Test' and press a key.\n", true);
 
 	printf("-- Bracketed paste\n");
 	if (decrqm_supported)
@@ -285,11 +317,7 @@ int main(int argc, char *argv[]) {
 
 	// Let the user see the results when run outside an interactive shell.
 	comm("-- Finished\n", true);
-
-	// TODO: see about unusual (new) terminfo entries.
-	//  - see man tmux, TERMINFO EXTENSIONS
-	//     - none of the terminfos seem to include these,
-	//       though I can look for them
+	// TODO: Look further than tmux(1) for unusual terminfo entries.
 
 	// atexit is broken in tcc -run, see https://savannah.nongnu.org/bugs/?56495
 	tty_atexit();
