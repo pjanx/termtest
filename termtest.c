@@ -276,10 +276,11 @@ int main(int argc, char *argv[]) {
 	comm(CSI "4c" DCS "0;0;0;q??~~??~~??iTiTiT" ST, false);
 
 	printf("-- Mouse protocol\n");
-	printf("Maximise the terminal window and click the rightmost column.\n");
-	// TODO: Bug the user into resizing it wide enough, or at least making
-	// the font smaller. Or maybe just warn, and say how many columns there
-	// need to be (255 - 32 + 1 = 224).
+	while (!ioctl(STDIN_FILENO, TIOCGWINSZ, &ws) && ws.ws_col < 223)
+		comm("Your terminal needs to be at least 223 columns wide.\n"
+			"Press a key once you've made it wide enough.\n", true);
+	printf("Click the rightmost column, if it's possible.\n");
+
 	int mouses[] = { 1005, 1006, 1015, 1016 };
 	for (size_t i = 0; i < sizeof mouses / sizeof *mouses; i++) {
 		if (decrqm_supported)
