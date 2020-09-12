@@ -33,8 +33,10 @@
 
 #define CSI "\x1b["
 #define OSC "\x1b]"
+#define DCS "\x1bP"
+#define ST  "\x1b\\"
+#define ST8 "\x9c"
 #define BEL "\x07"
-#define ST  "\x9c"
 
 extern char **environ;
 static struct termios saved_termios;
@@ -271,8 +273,7 @@ int main(int argc, char *argv[]) {
 	}
 
 	printf("-- Sixel graphics\n");
-	// TODO:
-	//  - hardcoded visual check
+	comm(CSI "4c" DCS "0;0;0;q??~~??~~??iTiTiT" ST, false);
 
 	printf("-- Mouse protocol\n");
 	printf("Maximise the terminal window and click the rightmost column.\n");
@@ -296,10 +297,10 @@ int main(int argc, char *argv[]) {
 	if (!strncmp(selection, OSC "52;", 5)) {
 		printf("We have received the selection from the terminal!" CSI "1m\n");
 		char *semi = strrchr(selection, ';');
-		*strpbrk(semi, BEL ST) = 0;
+		*strpbrk(semi, BEL ST8) = 0;
 		FILE *fp = popen("base64 -d", "w");
 		fprintf(fp, "%s", semi + 1);
-		fclose(fp);
+		pclose(fp);
 		printf(CSI "m\n");
 	}
 
