@@ -39,6 +39,8 @@
 #define ST8 "\x9c"
 #define BEL "\x07"
 
+#define SGR0 CSI "m"
+
 extern char **environ;
 static struct termios saved_termios;
 struct winsize ws;
@@ -153,6 +155,17 @@ static void test_mouse(int mode) {
 	comm("Waiting for button up events, press a key if hanging.\n", true);
 }
 
+// colour prints a cell with the given indexed colour as a background.
+static void colour(int n) {
+	n > 7 ? printf(CSI "48;5;%dm ", n) : printf(CSI "%dm ", 40 + n);
+}
+
+// direct prints a cell with the given direct colour as a background.
+// sep can be set either to ':' for ISO-8613-6 or ';' for more compatibility.
+static void direct(char sep, int r, int g, int b) {
+	printf(CSI "48%c2%c%d%c%d%c%dm ", sep, sep, r, sep, g, sep, b);
+}
+
 int main(int argc, char *argv[]) {
 	if (!tty_cbreak())
 		abort();
@@ -186,6 +199,10 @@ int main(int argc, char *argv[]) {
 	printf("%d\n", decrqm_supported);
 
 	printf("-- Colours\n");
+	start_color();  // Does this need initscr()?  ncurses doesn't initialise.
+	printf("Terminfo: %d colours, has_colors=%d\n",
+		tigetnum("colors"), has_colors());
+
 	char *colorterm = getenv("COLORTERM");
 	if (colorterm) {
 		printf("COLORTERM=%s", colorterm);
@@ -200,9 +217,13 @@ int main(int argc, char *argv[]) {
 	if (Tc && Tc != (char *)-1)
 		printf("Terminfo: tmux extension claims direct color.\n");
 
-	// TODO:
-	//  - terminfo
-	//  - hardcoded visual check
+	for (int n =   0; n <   8; n++) colour(n); printf(SGR0 "\n");
+	for (int n =   8; n <  16; n++) colour(n); printf(SGR0 "\n");
+	for (int n = 232; n < 256; n++) colour(n); printf(SGR0 "\n");
+
+	// Ideally, both ramps should be visible, and smooth.
+	for (int g = 255; g >= 192; g--) direct(';', 255, g, 0); printf(SGR0 "\n");
+	for (int g = 255; g >= 192; g--) direct(':', 255, g, 0); printf(SGR0 "\n");
 
 	printf("-- Colour change\n");
 	// TODO:
@@ -230,11 +251,11 @@ int main(int argc, char *argv[]) {
 		printf("\n");
 	}
 
-	printf(CSI "0;32;44m" "SGR" CSI "m ");
-	printf(CSI "1;32;44m" "Bold" CSI "m ");
-	printf(CSI "5;32;44m" "Blink" CSI "m ");
+	printf(CSI "0;32;44m" "SGR" SGR0 " ");
+	printf(CSI "1;32;44m" "Bold" SGR0 " ");
+	printf(CSI "5;32;44m" "Blink" SGR0 " ");
 	printf("\n");
-	printf(CSI "0;5m" "Blink with default colours." CSI "m");
+	printf(CSI "0;5m" "Blink with default colours." SGR0);
 	printf("\n");
 
 	printf("-- Italic attribute\n");
@@ -242,7 +263,7 @@ int main(int argc, char *argv[]) {
 	printf("Terminfo: %d\n", italic_supported);
 	if (italic_supported)
 		printf("%sTerminfo test.%s\n", enter_italics_mode, exit_italics_mode);
-	printf(CSI "3m" "SGR test.\n" CSI "0m");
+	printf(CSI "3m" "SGR test.\n" SGR0);
 
 	printf("-- Bar cursor\n");
 	const char *Ss = tigetstr("Ss");
