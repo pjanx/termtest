@@ -130,8 +130,14 @@ static void test_mouse(int mode) {
 	if (sscanf(resp, CSI "M%c%c%c", &bc, &xc, &yc) == 3
 		&& bc >= 32 && xc >= 32 && yc >= 32) {
 		// Beware that this isn't compatible with xterm run with the -lc switch.
-		if (strlen(resp) > 6) printf("1005\n");
-		else printf("1000/1005 (%d @ %d,%d)\n", bc - 32, xc - 32, yc - 32);
+		if (strlen(resp) > 6) {
+			printf("1005? ");
+			for (const char *p = resp; *p; p++)
+				printf("%c", *p < 32 || *p > 127 ? '.' : *p);
+			printf("\n");
+		} else {
+			printf("1000/1005 (%d @ %d,%d)\n", bc - 32, xc - 32, yc - 32);
+		}
 	} else if (sscanf(resp, CSI "<%u;%u;%u%c", &b, &x, &y, &m) == 4
 		&& (m == 'm' || m == 'M')) {
 		printf("%s (%u%c @ %u,%u)\n",
@@ -323,6 +329,7 @@ int main(int argc, char *argv[]) {
 	// so we'd have to use Xlib, and that is too much effort.
 	char *pasted = comm(CSI "?2004h" "Paste something: ", true);
 	printf("%d\n", !strncmp(pasted, CSI "200~", 6));
+	comm(CSI "?2004l", false);
 
 	// Let the user see the results when run outside an interactive shell.
 	comm("-- Finished\n", true);
