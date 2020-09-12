@@ -204,7 +204,7 @@ int main(int argc, char *argv[]) {
 	//  - see acolors.sh from xterm's vttests, it changes terminal colours
 	//    (and urxvt passed that, at least apparently)
 
-	printf("-- Blink attribute\n");
+	printf("-- Bold and blink attributes\n");
 	bool bbc_supported = enter_bold_mode && enter_blink_mode
 		&& set_a_foreground && set_a_background && exit_attribute_mode;
 	printf("Terminfo: %d\n", bbc_supported);
