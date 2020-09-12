@@ -27,6 +27,7 @@
 #include <poll.h>
 #include <termios.h>
 #include <sys/ioctl.h>
+#include <glob.h>
 
 #include <curses.h>
 #include <term.h>
@@ -257,19 +258,23 @@ int main(int argc, char *argv[]) {
 	const char *windowid = getenv("WINDOWID");
 	if (windowid) {
 		printf("WINDOWID=%s\n", windowid);
+		printf("There should be a picture. Press a key.\n");
+		poll(NULL, 0, 50 /* wait for a refresh */);
 
 		char buf[1000] = "";
 		snprintf(buf, sizeof buf, "/usr/lib/w3m:%s", getenv("PATH"));
 		setenv("PATH", buf, true /* replace */);
 
-		// TODO:
-		//  - run w3mimgdisplay now, hardcoded visual check
-		//  - I guess I'll need a picture to show
-		//     - /usr/share/pixmaps/debian-logo.png
-		//     - /usr/share/icons/HighContrast/48x48/stock/gtk-yes.png
-		//     - we get run from a relative path, so not sure about local
-		//     - or we can create our own picture, something easily compressible
-		//        - can even pass that as an fd during fork and use /dev/fd/N
+		glob_t gb;
+		glob("/usr/share/pixmaps/*.xpm", 0, NULL, &gb);
+		glob("/usr/share/pixmaps/*.png", GLOB_APPEND, NULL, &gb);
+
+		FILE *fp = popen("w3mimgdisplay >/dev/null", "w");
+		fprintf(fp, "0;1;0;0;%d;%d;;;;;%s\n4;\n3;", 100, 100, gb.gl_pathv[0]);
+		pclose(fp);
+		globfree(&gb);
+
+		comm("", true);
 	}
 
 	printf("-- Sixel graphics\n");
