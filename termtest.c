@@ -281,9 +281,11 @@ int main(int argc, char *argv[]) {
 	comm(CSI "4c" DCS "0;0;0;q??~~??~~??iTiTiT" ST, false);
 
 	printf("-- Mouse protocol\n");
-	while (!ioctl(STDIN_FILENO, TIOCGWINSZ, &ws) && ws.ws_col < 223)
-		comm("Your terminal needs to be at least 223 columns wide.\n"
-			"Press a key once you've made it wide enough.\n", true);
+	while (!ioctl(STDIN_FILENO, TIOCGWINSZ, &ws) && ws.ws_col < 223) {
+		if (!*comm("Your terminal needs to be at least 223 columns wide.\n"
+			"Press a key once you've made it wide enough.\n", true))
+			break;
+	}
 	printf("Click the rightmost column, if it's possible.\n");
 
 	int mouses[] = { 1005, 1006, 1015, 1016 };
