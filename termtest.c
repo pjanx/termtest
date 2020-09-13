@@ -271,6 +271,13 @@ int main(int argc, char *argv[]) {
 		printf("Terminfo: found tmux extension.\n");
 	printf(CSI "53m" "SGR test.\n" SGR0);
 
+	printf("-- Underline colour\n");
+	const char *Setulc = tigetstr("Setulc");
+	if (Setulc && Setulc != (char*)-1)
+		printf("Terminfo: found tmux extension.\n");
+	printf(CSI "4;58;2;0;255;0m" "SGR test." SGR0 "\n");
+	printf(CSI "4;58:5:46m" "SGR test." SGR0 "\n");
+
 	printf("-- Bar cursor\n");
 	const char *Ss = tigetstr("Ss");
 	const char *Se = tigetstr("Se");
