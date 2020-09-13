@@ -211,8 +211,9 @@ int main(int argc, char *argv[]) {
 		printf("\n");
 	}
 
-	// See tmux(1), TERMINFO EXTENSIONS. These are somewhat unusual,
-	// including them out of curiosity.
+	// For a comprehensive list of unusual terminfo entries, see tmux(1),
+	// user_caps(5), and comments in misc/terminfo.src. Looking for them
+	// here out of curiosity, all sequences are mostly standardised.
 	const char *Tc = tigetstr("Tc");
 	if (Tc && Tc != (char *)-1)
 		printf("Terminfo: tmux extension claims direct color.\n");
@@ -226,11 +227,37 @@ int main(int argc, char *argv[]) {
 	for (int g = 255; g >= 192; g--) direct(':', 255, g, 0); printf(SGR0 "\n");
 
 	printf("-- Colour change\n");
-	// TODO:
-	//  - terminfo
-	//  - hardcoded visual check
-	//  - see acolors.sh from xterm's vttests, it changes terminal colours
-	//    (and urxvt passed that, at least apparently)
+	printf("Terminfo: can_change %d, initialize_color %d\n",
+		!!can_change, !!initialize_color);
+
+	// The response from urxvt is wrongly missing the colour number.
+	char *bright_red_save = comm(OSC "4;9;?" BEL, false);
+	if (!strncmp(bright_red_save, OSC "4;", 4)) {
+		char *copy = strdup(bright_red_save + 4);
+		*strpbrk(copy, BEL ST8 "\x1b") = 0;
+		printf("We have read colour contents from the terminal: %s\n", copy);
+	} else *bright_red_save = 0;
+
+	printf(CSI "0;38;5;9m" "Indexed" SGR0 " " CSI "1;31m" "Bold" SGR0 "\n");
+	printf("Press a key to stop.\n");
+	for (int r = 0; r < 255; r += 8) {
+		char buf[1000] = "";
+		snprintf(buf, sizeof buf, OSC "4;9;rgb:%02x/%02x/%02x" BEL, r, 0, 0);
+		if (*comm(buf, false)) break;
+		poll(NULL, 0, 50 /* delay */);
+	}
+	if (*bright_red_save)
+		comm(bright_red_save, false);
+
+	// Linux palette sequence, supported by e.g. pterm.
+	// We must take care to suffix it with an OSC terminator at least.
+	for (int r = 0; r < 255; r += 8) {
+		char buf[1000] = "";
+		snprintf(buf, sizeof buf, OSC "P9%02x%02x%02x", r, 0, 0);
+		if (*comm(buf, false)) break;
+		poll(NULL, 0, 50 /* delay */);
+	}
+	printf("\a\r");
 
 	printf("-- Bold and blink attributes\n");
 	bool bbc_supported = enter_bold_mode && enter_blink_mode
@@ -292,6 +319,7 @@ int main(int argc, char *argv[]) {
 	printf("\n");
 
 	// There's no actual way of restoring this to what it was before.
+	// Terminfo "cnorm" at most undoes blinking in xterm.
 	comm(CSI "2 q", false);
 
 	printf("-- w3mimgdisplay\n");
@@ -321,6 +349,9 @@ int main(int argc, char *argv[]) {
 	comm(CSI "4c" DCS "0;0;0;q??~~??~~??iTiTiT" ST, false);
 
 	printf("-- Mouse protocol\n");
+	// TODO: Inspect terminfo kmous, XM, xm.
+	//  - We can say what protocol kmous expects, whether 1000 or 1006.
+	//     - Sadly urxvt still has the 1000/1005 sequence there.
 	while (!ioctl(STDIN_FILENO, TIOCGWINSZ, &ws) && ws.ws_col < 223) {
 		if (!*comm("Your terminal needs to be at least 223 columns wide.\n"
 			"Press a key once you've made it wide enough.\n", true))
@@ -345,7 +376,7 @@ int main(int argc, char *argv[]) {
 	if (!strncmp(selection, OSC "52;", 5)) {
 		printf("We have received the selection from the terminal!" CSI "1m\n");
 		char *semi = strrchr(selection, ';');
-		*strpbrk(semi, BEL ST8) = 0;
+		*strpbrk(semi, BEL ST8 "\x1b") = 0;
 		FILE *fp = popen("base64 -d", "w");
 		fprintf(fp, "%s", semi + 1);
 		pclose(fp);
@@ -367,7 +398,6 @@ int main(int argc, char *argv[]) {
 
 	// Let the user see the results when run outside an interactive shell.
 	comm("-- Finished\n", true);
-	// TODO: Look further than tmux(1) for unusual terminfo entries.
 
 	// atexit is broken in tcc -run, see https://savannah.nongnu.org/bugs/?56495
 	tty_atexit();
