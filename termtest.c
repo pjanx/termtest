@@ -265,6 +265,12 @@ int main(int argc, char *argv[]) {
 		printf("%sTerminfo test.%s\n", enter_italics_mode, exit_italics_mode);
 	printf(CSI "3m" "SGR test.\n" SGR0);
 
+	printf("-- Overline attribute\n");
+	const char *Smol = tigetstr("Smol");
+	if (Smol && Smol != (char*)-1)
+		printf("Terminfo: found tmux extension.\n");
+	printf(CSI "53m" "SGR test.\n" SGR0);
+
 	printf("-- Bar cursor\n");
 	const char *Ss = tigetstr("Ss");
 	const char *Se = tigetstr("Se");
