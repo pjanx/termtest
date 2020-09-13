@@ -357,8 +357,18 @@ int main(int argc, char *argv[]) {
 			"Press a key once you've made it wide enough.\n", true))
 			break;
 	}
-	printf("Click the rightmost column, if it's possible.\n");
 
+	comm(CSI "?1000h" CSI "?1004h", false);
+	printf("Focus in and out of the window, press a key to abort.\n");
+	while (true) {
+		char *in = comm("", true);
+		if (*in != '\x1b') break;
+		else if (in[1] == '[' && in[2] == 'I') printf("Focused in.\n");
+		else if (in[1] == '[' && in[2] == 'O') printf("Focused out.\n");
+	}
+	comm(CSI "?1000l" CSI "?1004l", false);
+
+	printf("Click the rightmost column, if it's possible.\n");
 	int mouses[] = { 1005, 1006, 1015, 1016 };
 	for (size_t i = 0; i < sizeof mouses / sizeof *mouses; i++) {
 		if (decrqm_supported)
