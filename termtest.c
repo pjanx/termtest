@@ -157,6 +157,14 @@ static void test_mouse(int mode) {
 	comm("Waiting for button up events, press a key if hanging.\n", true);
 }
 
+// parse_decrpss checks a DECRPSS sequence and cuts out the inner part.
+// Returns NULL if it fails to validate.
+static char *parse_decrpss(char *resp) {
+	if (strncmp(resp, DCS "1$r", 5)) return NULL;
+	*strpbrk(resp + 5, BEL ST8 "\x1b") = 0;
+	return resp + 5;
+}
+
 // colour prints a cell with the given indexed colour as a background.
 static void colour(int n) {
 	n > 7 ? printf(CSI "48;5;%dm ", n) : printf(CSI "%dm ", 40 + n);
@@ -220,6 +228,26 @@ int main(int argc, char *argv[]) {
 	if (Tc && Tc != (char *)-1)
 		printf("Terminfo: tmux extension claims direct color.\n");
 
+	// Check the confusion, see https://gist.github.com/XVilka/8346728
+	char *sgr5_semi =
+		parse_decrpss(comm(CSI "48;5;160m"      DCS "$qm" ST "\r", false));
+	char *sgr5_colon =
+		parse_decrpss(comm(CSI "48:5:161m"      DCS "$qm" ST "\r", false));
+	char *sgr2_colon =
+		parse_decrpss(comm(CSI "48:2::255:0:0m" DCS "$qm" ST "\r", false));
+	char *sgr2_double =
+		parse_decrpss(comm(CSI "48:2::0:255:0m" DCS "$qm" ST "\r", false));
+	comm(SGR0, false);
+
+	if (sgr5_semi)
+		printf("SGR 160, semicolon:        %s\n", sgr5_semi);
+	if (sgr5_colon)
+		printf("SGR 161, colon:            %s\n", sgr5_colon);
+	if (sgr2_colon)
+		printf("SGR #ff0000, colon:        %s\n", sgr2_colon);
+	if (sgr2_double)
+		printf("SGR #00ff00, double colon: %s\n", sgr2_double);
+
 	for (int n =   0; n <   8; n++) colour(n); printf(SGR0 "\n");
 	for (int n =   8; n <  16; n++) colour(n); printf(SGR0 "\n");
 	for (int n = 232; n < 256; n++) colour(n); printf(SGR0 "\n");
@@ -254,14 +282,13 @@ int main(int argc, char *argv[]) {
 		comm(OSC "104;9" BEL, false);
 
 	// Linux palette sequence, supported by e.g. pterm.
-	// We must take care to suffix it with an OSC terminator at least.
 	for (int r = 0; r < 255; r += 8) {
 		char buf[1000] = "";
 		snprintf(buf, sizeof buf, OSC "P9%02x%02x%02x", r, 0, 0);
 		if (*comm(buf, false)) break;
 		poll(NULL, 0, 50 /* delay */);
 	}
-	printf("\a\r");
+	comm("\a\r", false);  // Take care of unsupporting terminals.
 
 	printf("-- Bold and blink attributes\n");
 	bool bbc_supported = enter_bold_mode && enter_blink_mode
@@ -316,13 +343,15 @@ int main(int argc, char *argv[]) {
 		printf("Terminfo: found tmux extension for setting.\n");
 	if (Se && Se != (char*)-1)
 		printf("Terminfo: found tmux extension for resetting.\n");
+	if (parse_decrpss(comm(DCS "$q q" ST "\r", false)))
+		printf("DECRQSS told us about cursor appearance!\n");
 
 	comm(CSI "5 q" "Blinking (press a key): ", true);
 	printf("\n");
 	comm(CSI "6 q" "Steady (press a key): ", true);
 	printf("\n");
 
-	// There's no actual way of restoring this to what it was before.
+	// There's no widely supported way of restoring this to what it was before.
 	// Terminfo "cnorm" at most undoes blinking in xterm.
 	comm(CSI "2 q", false);
 
