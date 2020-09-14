@@ -75,10 +75,12 @@ static char *comm(const char *req, bool wait_first) {
 	ssize_t len = write(STDOUT_FILENO, req, strlen(req));
 	if (len < strlen(req)) return NULL;
 
-	char buf[1000] = ""; size_t buf_len = 0; int n = 0;
 	struct pollfd pfd = { .fd = STDIN_FILENO, .events = POLLIN };
 	if (wait_first) poll(&pfd, 1, -1);
-	while ((n = poll(&pfd, 1, 50 /* unreliable, timing-dependent */))) {
+
+	int lag = getenv("SSH_CONNECTION") ? 250 : 50;
+	char buf[1000] = ""; size_t buf_len = 0; int n = 0;
+	while ((n = poll(&pfd, 1, lag /* unreliable, timing-dependent */))) {
 		if (n < 0) return NULL;
 		len = read(STDIN_FILENO, buf + buf_len, sizeof buf - buf_len - 1);
 		if (len <= 0) return NULL;
