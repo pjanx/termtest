@@ -250,6 +250,8 @@ int main(int argc, char *argv[]) {
 	}
 	if (*bright_red_save)
 		comm(bright_red_save, false);
+	else
+		comm(OSC "104;9" BEL, false);
 
 	// Linux palette sequence, supported by e.g. pterm.
 	// We must take care to suffix it with an OSC terminator at least.
