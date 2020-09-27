@@ -379,6 +379,16 @@ int main(int argc, char *argv[]) {
 	}
 
 	printf("-- Sixel graphics\n");
+	char *da1 = comm(CSI "c", false);
+	if (!strncmp(da1, CSI "?", 3)) {
+		char *p = da1 + 3, *end = p; long mode;
+		while ((mode = strtol(p, &end, 10)) && (*end == ';' || *end == 'c')) {
+			if (mode == 4)
+				printf("DA1: the terminal claims to support Sixel graphics.\n");
+			p = end + 1;
+		}
+	}
+
 	comm(CSI "4c" DCS "0;0;0;q??~~??~~??iTiTiT" ST, false);
 
 	printf("-- Mouse protocol\n");
