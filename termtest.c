@@ -330,6 +330,11 @@ int main(int argc, char *argv[]) {
 	printf(CSI "53m" "SGR test.\n" SGR0);
 
 	printf("-- Underline colour\n");
+	const char *setal = tigetstr("setal");
+	const char *ol = tigetstr("ol");
+	if (setal && setal != (char*)-1 &&
+		ol && ol != (char*)-1)
+		printf("Terminfo: found mintty extension.\n");
 	const char *Setulc = tigetstr("Setulc");
 	if (Setulc && Setulc != (char*)-1)
 		printf("Terminfo: found tmux extension.\n");
@@ -401,6 +406,23 @@ int main(int argc, char *argv[]) {
 			break;
 	}
 
+	printf("Click the rightmost column, if it's possible.\n");
+	int mouses[] = { 1005, 1006, 1015, 1016 };
+	for (size_t i = 0; i < sizeof mouses / sizeof *mouses; i++) {
+		if (decrqm_supported)
+			printf("DECRQM(%d): %s\n", mouses[i], deccheck(mouses[i]));
+		test_mouse(mouses[i]);
+	}
+	comm(CSI "?1000l", false);
+
+	printf("-- Focus events\n");
+	const char *Dsfcs = tigetstr("Dsfcs");
+	const char *Enfcs = tigetstr("Enfcs");
+	if (Dsfcs && Dsfcs != (char*)-1 &&
+		Enfcs && Enfcs != (char*)-1)
+		printf("Terminfo: found tmux extension.\n");
+	if (decrqm_supported)
+		printf("DECRQM: %s\n", deccheck(1004));
 	comm(CSI "?1000h" CSI "?1004h", false);
 	printf("Focus in and out of the window, press a key to abort.\n");
 	while (true) {
@@ -411,19 +433,10 @@ int main(int argc, char *argv[]) {
 	}
 	comm(CSI "?1000l" CSI "?1004l", false);
 
-	printf("Click the rightmost column, if it's possible.\n");
-	int mouses[] = { 1005, 1006, 1015, 1016 };
-	for (size_t i = 0; i < sizeof mouses / sizeof *mouses; i++) {
-		if (decrqm_supported)
-			printf("DECRQM(%d): %s\n", mouses[i], deccheck(mouses[i]));
-		test_mouse(mouses[i]);
-	}
-	comm(CSI "?1000l", false);
-
 	printf("-- Selection\n");
 	const char *Ms = tigetstr("Ms");
 	if (Ms && Ms != (char *)-1)
-		printf("Terminfo: found tmux extension for selections.\n");
+		printf("Terminfo: found tmux extension.\n");
 
 	char *selection = comm(OSC "52;pc;?" BEL, false);
 	if (!strncmp(selection, OSC "52;", 5)) {
@@ -440,6 +453,11 @@ int main(int argc, char *argv[]) {
 	comm("Check if the selection now contains 'Test' and press a key.\n", true);
 
 	printf("-- Bracketed paste\n");
+	const char *Dsbp = tigetstr("Dsbp");
+	const char *Enbp = tigetstr("Enbp");
+	if (Dsbp && Dsbp != (char*)-1 &&
+		Enbp && Enbp != (char*)-1)
+		printf("Terminfo: found tmux extension.\n");
 	if (decrqm_supported)
 		printf("DECRQM: %s\n", deccheck(2004));
 
