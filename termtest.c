@@ -1,7 +1,7 @@
 //
 // termtest: terminal evaluation tool
 //
-// Copyright (c) 2020, Přemysl Eric Janouch <p@janouch.name>
+// Copyright (c) 2020 - 2021, Přemysl Eric Janouch <p@janouch.name>
 //
 // Permission to use, copy, modify, and/or distribute this software for any
 // purpose with or without fee is hereby granted.
@@ -31,6 +31,9 @@
 
 #include <curses.h>
 #include <term.h>
+
+// tiparm is ncurses-specific, let's make this a tiny bit more portable.
+#define TIPARM(s, v1) tparm((s), (long) (v1))
 
 #define CSI "\x1b["
 #define OSC "\x1b]"
@@ -295,16 +298,16 @@ int main(int argc, char *argv[]) {
 		&& set_a_foreground && set_a_background && exit_attribute_mode;
 	printf("Terminfo: %d\n", bbc_supported);
 	if (bbc_supported) {
-		tputs(tiparm(set_a_foreground, COLOR_GREEN), 1, putchar);
-		tputs(tiparm(set_a_background, COLOR_BLUE), 1, putchar);
+		tputs(TIPARM(set_a_foreground, COLOR_GREEN), 1, putchar);
+		tputs(TIPARM(set_a_background, COLOR_BLUE), 1, putchar);
 		printf("Terminfo%s ", exit_attribute_mode);
 		tputs(enter_bold_mode, 1, putchar);
-		tputs(tiparm(set_a_foreground, COLOR_GREEN), 1, putchar);
-		tputs(tiparm(set_a_background, COLOR_BLUE), 1, putchar);
+		tputs(TIPARM(set_a_foreground, COLOR_GREEN), 1, putchar);
+		tputs(TIPARM(set_a_background, COLOR_BLUE), 1, putchar);
 		printf("Bold%s ", exit_attribute_mode);
 		tputs(enter_blink_mode, 1, putchar);
-		tputs(tiparm(set_a_foreground, COLOR_GREEN), 1, putchar);
-		tputs(tiparm(set_a_background, COLOR_BLUE), 1, putchar);
+		tputs(TIPARM(set_a_foreground, COLOR_GREEN), 1, putchar);
+		tputs(TIPARM(set_a_background, COLOR_BLUE), 1, putchar);
 		printf("Blink%s ", exit_attribute_mode);
 		printf("\n");
 	}
