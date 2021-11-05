@@ -17,17 +17,17 @@
 
 // NOTE: We don't need to and will not free any memory. This is intentional.
 
+#include <ctype.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <ctype.h>
-#include <errno.h>
 
-#include <unistd.h>
-#include <poll.h>
-#include <termios.h>
-#include <sys/ioctl.h>
 #include <glob.h>
+#include <poll.h>
+#include <sys/ioctl.h>
+#include <termios.h>
+#include <unistd.h>
 
 #include <curses.h>
 #include <term.h>
@@ -65,7 +65,7 @@ static bool tty_cbreak() {
 		return false;
 
 	if (tcgetattr(STDIN_FILENO, &buf) < 0 || (buf.c_lflag & (ECHO | ICANON)) ||
-			buf.c_cc[VMIN] != 1 || buf.c_cc[VTIME] != 0) {
+		buf.c_cc[VMIN] != 1 || buf.c_cc[VTIME] != 0) {
 		tcsetattr(STDIN_FILENO, TCSAFLUSH, &saved_termios);
 		return false;
 	}
@@ -76,17 +76,25 @@ static bool tty_cbreak() {
 // if it didn't manage to get a response, or when an error has happened.
 static char *comm(const char *req, bool wait_first) {
 	ssize_t len = write(STDOUT_FILENO, req, strlen(req));
-	if (len < strlen(req)) return NULL;
+	if (len < strlen(req))
+		return NULL;
 
 	struct pollfd pfd = { .fd = STDIN_FILENO, .events = POLLIN };
-	if (wait_first) poll(&pfd, 1, -1);
+	if (wait_first)
+		poll(&pfd, 1, -1);
 
 	int lag = getenv("SSH_CONNECTION") ? 250 : 50;
-	char buf[1000] = ""; size_t buf_len = 0; int n = 0;
+	char buf[1000] = "";
+	size_t buf_len = 0;
+	int n = 0;
 	while ((n = poll(&pfd, 1, lag /* unreliable, timing-dependent */))) {
-		if (n < 0) return NULL;
+		if (n < 0)
+			return NULL;
+
 		len = read(STDIN_FILENO, buf + buf_len, sizeof buf - buf_len - 1);
-		if (len <= 0) return NULL;
+		if (len <= 0)
+			return NULL;
+
 		buf_len += len;
 	}
 	return strdup(buf);
@@ -96,29 +104,44 @@ enum { DEC_UNKNOWN, DEC_SET, DEC_RESET, DEC_PERMSET, DEC_PERMRESET };
 
 // decrpmstr returns a textual description of a DECRPM response.
 static const char *decrpmstr(int status) {
-	if (status == DEC_UNKNOWN)   return "unknown";
-	if (status == DEC_SET)       return "set";
-	if (status == DEC_RESET)     return "reset";
-	if (status == DEC_PERMSET)   return "permanently set";
-	if (status == DEC_PERMRESET) return "permanently reset";
-	return "?";
+	switch (status) {
+	case DEC_UNKNOWN:
+		return "unknown";
+	case DEC_SET:
+		return "set";
+	case DEC_RESET:
+		return "reset";
+	case DEC_PERMSET:
+		return "permanently set";
+	case DEC_PERMRESET:
+		return "permanently reset";
+	default:
+		return "?";
+	}
 }
 
 // parse_decrpm returns whether the mode response is valid (result >= 0),
 // as well as the terminal's response if it is, see the DEC_* constants.
 static int parse_decrpm(const char *resp) {
 	// E.g., \x1b[?1000;2$y
-	if (resp[0] != '\x1b' || resp[1] != '[' || resp[2] != '?') return -1;
-	char *end = NULL; errno = 0; long mode = strtol(resp + 3, &end, 10);
-	if (errno || mode < 0 || *end != ';') return -1;
-	if (!isdigit(end[1]) || end[2] != '$' || end[3] != 'y' || end[4]) return -1;
+	if (resp[0] != '\x1b' || resp[1] != '[' || resp[2] != '?')
+		return -1;
+
+	char *end = NULL;
+	errno = 0;
+	long mode = strtol(resp + 3, &end, 10);
+	if (errno || mode < 0 || *end != ';')
+		return -1;
+	if (!isdigit(end[1]) || end[2] != '$' || end[3] != 'y' || end[4])
+		return -1;
 	return end[1] - '0';
 }
 
 // deccheck checks whether a particular DEC mode is supported, whether it is
 // enabled, and returns that information as a string.
 static const char *deccheck(int number) {
-	char buf[1000] = ""; snprintf(buf, sizeof buf, CSI "?%d$p", number);
+	char buf[1000] = "";
+	snprintf(buf, sizeof buf, CSI "?%d$p", number);
 	return decrpmstr(parse_decrpm(comm(buf, false)));
 }
 
@@ -134,8 +157,8 @@ static void test_mouse(int mode) {
 
 	unsigned int b = -1, x = -1, y = -1;
 	unsigned char bc = -1, xc = -1, yc = -1, m = -1;
-	if (sscanf(resp, CSI "M%c%c%c", &bc, &xc, &yc) == 3
-		&& bc >= 32 && xc >= 32 && yc >= 32) {
+	if (sscanf(resp, CSI "M%c%c%c", &bc, &xc, &yc) == 3 &&
+		bc >= 32 && xc >= 32 && yc >= 32) {
 		// Beware that this isn't compatible with xterm run with the -lc switch.
 		if (strlen(resp) > 6) {
 			printf("1005? ");
@@ -145,13 +168,13 @@ static void test_mouse(int mode) {
 		} else {
 			printf("1000/1005 (%d @ %d,%d)\n", bc - 32, xc - 32, yc - 32);
 		}
-	} else if (sscanf(resp, CSI "<%u;%u;%u%c", &b, &x, &y, &m) == 4
-		&& (m == 'm' || m == 'M')) {
+	} else if (sscanf(resp, CSI "<%u;%u;%u%c", &b, &x, &y, &m) == 4 &&
+		(m == 'm' || m == 'M')) {
 		printf("%s (%u%c @ %u,%u)\n",
 			(x > ws.ws_col || y > ws.ws_row) ? "1016" : "1006/1016",
 			b, m, x, y);
-	} else if (sscanf(resp, CSI "%u;%u;%u%c", &b, &x, &y, &m) == 4
-		&& m == 'M') {
+	} else if (sscanf(resp, CSI "%u;%u;%u%c", &b, &x, &y, &m) == 4 &&
+		m == 'M') {
 		printf("1015 (%u @ %u,%u)\n", b - 32, x, y);
 	} else {
 		printf("Failed to parse.\n");
@@ -163,7 +186,9 @@ static void test_mouse(int mode) {
 // parse_decrpss checks a DECRPSS sequence and cuts out the inner part.
 // Returns NULL if it fails to validate.
 static char *parse_decrpss(char *resp) {
-	if (strncmp(resp, DCS "1$r", 5)) return NULL;
+	if (strncmp(resp, DCS "1$r", 5))
+		return NULL;
+
 	*strpbrk(resp + 5, BEL ST8 "\x1b") = 0;
 	return resp + 5;
 }
@@ -189,8 +214,9 @@ int main(int argc, char *argv[]) {
 	printf("\n");
 
 	// Initialise terminfo, this should definitely succeed.
-	int err; char *term = getenv("TERM");
-	if (setupterm((char *)term, 1, &err) != OK)
+	int err;
+	char *term = getenv("TERM");
+	if (setupterm((char *) term, 1, &err) != OK)
 		abort();
 
 	// VTE wouldn't have sent a response to DECRQM otherwise!
@@ -212,7 +238,7 @@ int main(int argc, char *argv[]) {
 	printf("%d\n", decrqm_supported);
 
 	printf("-- Colours\n");
-	start_color();  // Does this need initscr()?  ncurses doesn't initialise.
+	start_color(); // Does this need initscr()?  ncurses doesn't initialise.
 	printf("Terminfo: %d colours, has_colors=%d\n",
 		tigetnum("colors"), has_colors());
 
@@ -228,7 +254,7 @@ int main(int argc, char *argv[]) {
 	// user_caps(5), and comments in misc/terminfo.src. Looking for them
 	// here out of curiosity, all sequences are mostly standardised.
 	const char *Tc = tigetstr("Tc");
-	if (Tc && Tc != (char *)-1)
+	if (Tc && Tc != (char *) -1)
 		printf("Terminfo: tmux extension claims direct color.\n");
 
 	// Check the confusion, see https://gist.github.com/XVilka/8346728
@@ -269,14 +295,17 @@ int main(int argc, char *argv[]) {
 		char *copy = strdup(bright_red_save + 4);
 		*strpbrk(copy, BEL ST8 "\x1b") = 0;
 		printf("We have read colour contents from the terminal: %s\n", copy);
-	} else *bright_red_save = 0;
+	} else
+		*bright_red_save = 0;
 
 	printf(CSI "0;38;5;9m" "Indexed" SGR0 " " CSI "1;31m" "Bold" SGR0 "\n");
 	printf("Press a key to stop.\n");
 	for (int r = 0; r < 255; r += 8) {
 		char buf[1000] = "";
 		snprintf(buf, sizeof buf, OSC "4;9;rgb:%02x/%02x/%02x" BEL, r, 0, 0);
-		if (*comm(buf, false)) break;
+		if (*comm(buf, false))
+			break;
+
 		poll(NULL, 0, 50 /* delay */);
 	}
 	if (*bright_red_save)
@@ -288,14 +317,16 @@ int main(int argc, char *argv[]) {
 	for (int r = 0; r < 255; r += 8) {
 		char buf[1000] = "";
 		snprintf(buf, sizeof buf, OSC "P9%02x%02x%02x", r, 0, 0);
-		if (*comm(buf, false)) break;
+		if (*comm(buf, false))
+			break;
+
 		poll(NULL, 0, 50 /* delay */);
 	}
-	comm("\a\r", false);  // Take care of unsupporting terminals.
+	comm("\a\r", false); // Take care of unsupporting terminals.
 
 	printf("-- Bold and blink attributes\n");
-	bool bbc_supported = enter_bold_mode && enter_blink_mode
-		&& set_a_foreground && set_a_background && exit_attribute_mode;
+	bool bbc_supported = enter_bold_mode && enter_blink_mode &&
+		set_a_foreground && set_a_background && exit_attribute_mode;
 	printf("Terminfo: %d\n", bbc_supported);
 	if (bbc_supported) {
 		tputs(TIPARM(set_a_foreground, COLOR_GREEN), 1, putchar);
@@ -328,18 +359,17 @@ int main(int argc, char *argv[]) {
 
 	printf("-- Overline attribute\n");
 	const char *Smol = tigetstr("Smol");
-	if (Smol && Smol != (char*)-1)
+	if (Smol && Smol != (char *) -1)
 		printf("Terminfo: found tmux extension.\n");
 	printf(CSI "53m" "SGR test.\n" SGR0);
 
 	printf("-- Underline colour\n");
 	const char *setal = tigetstr("setal");
 	const char *ol = tigetstr("ol");
-	if (setal && setal != (char*)-1 &&
-		ol && ol != (char*)-1)
+	if (setal && setal != (char *) -1 && ol && ol != (char *) -1)
 		printf("Terminfo: found mintty extension.\n");
 	const char *Setulc = tigetstr("Setulc");
-	if (Setulc && Setulc != (char*)-1)
+	if (Setulc && Setulc != (char *) -1)
 		printf("Terminfo: found tmux extension.\n");
 	printf(CSI "4;58;2;0;255;0m" "SGR test." SGR0 "\n");
 	printf(CSI "4;58:5:46m" "SGR test." SGR0 "\n");
@@ -347,9 +377,9 @@ int main(int argc, char *argv[]) {
 	printf("-- Bar cursor\n");
 	const char *Ss = tigetstr("Ss");
 	const char *Se = tigetstr("Se");
-	if (Ss && Ss != (char*)-1)
+	if (Ss && Ss != (char *) -1)
 		printf("Terminfo: found tmux extension for setting.\n");
-	if (Se && Se != (char*)-1)
+	if (Se && Se != (char *) -1)
 		printf("Terminfo: found tmux extension for resetting.\n");
 	if (parse_decrpss(comm(DCS "$q q" ST "\r", false)))
 		printf("DECRQSS told us about cursor appearance!\n");
@@ -389,7 +419,8 @@ int main(int argc, char *argv[]) {
 	printf("-- Sixel graphics\n");
 	char *da1 = comm(CSI "c", false);
 	if (!strncmp(da1, CSI "?", 3)) {
-		char *p = da1 + 3, *end = p; long mode;
+		char *p = da1 + 3, *end = p;
+		long mode;
 		while ((mode = strtol(p, &end, 10)) && (*end == ';' || *end == 'c')) {
 			if (mode == 4)
 				printf("DA1: the terminal claims to support Sixel graphics.\n");
@@ -421,8 +452,7 @@ int main(int argc, char *argv[]) {
 	printf("-- Focus events\n");
 	const char *Dsfcs = tigetstr("Dsfcs");
 	const char *Enfcs = tigetstr("Enfcs");
-	if (Dsfcs && Dsfcs != (char*)-1 &&
-		Enfcs && Enfcs != (char*)-1)
+	if (Dsfcs && Dsfcs != (char *) -1 && Enfcs && Enfcs != (char *) -1)
 		printf("Terminfo: found tmux extension.\n");
 	if (decrqm_supported)
 		printf("DECRQM: %s\n", deccheck(1004));
@@ -430,15 +460,18 @@ int main(int argc, char *argv[]) {
 	printf("Focus in and out of the window, press a key to abort.\n");
 	while (true) {
 		char *in = comm("", true);
-		if (*in != '\x1b') break;
-		else if (in[1] == '[' && in[2] == 'I') printf("Focused in.\n");
-		else if (in[1] == '[' && in[2] == 'O') printf("Focused out.\n");
+		if (*in != '\x1b')
+			break;
+		else if (in[1] == '[' && in[2] == 'I')
+			printf("Focused in.\n");
+		else if (in[1] == '[' && in[2] == 'O')
+			printf("Focused out.\n");
 	}
 	comm(CSI "?1000l" CSI "?1004l", false);
 
 	printf("-- Selection\n");
 	const char *Ms = tigetstr("Ms");
-	if (Ms && Ms != (char *)-1)
+	if (Ms && Ms != (char *) -1)
 		printf("Terminfo: found tmux extension.\n");
 
 	char *selection = comm(OSC "52;pc;?" BEL, false);
@@ -458,8 +491,7 @@ int main(int argc, char *argv[]) {
 	printf("-- Bracketed paste\n");
 	const char *Dsbp = tigetstr("Dsbp");
 	const char *Enbp = tigetstr("Enbp");
-	if (Dsbp && Dsbp != (char*)-1 &&
-		Enbp && Enbp != (char*)-1)
+	if (Dsbp && Dsbp != (char *) -1 && Enbp && Enbp != (char *) -1)
 		printf("Terminfo: found tmux extension.\n");
 	if (decrqm_supported)
 		printf("DECRQM: %s\n", deccheck(2004));
